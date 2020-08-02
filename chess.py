@@ -7,7 +7,7 @@ from time import  ctime
 import threading
 import time
 
-client = socket.socket()#声明socket类型，同时生成socket连接对象
+
 color_number = 1 #每次运行都是黑棋先走
 size = 16
 stop = 0
@@ -17,6 +17,7 @@ running = 0
 waiting = 1
 match_sucess = 0
 me_active = 0
+connected = 0
 
 last_chess = [0,0,0,0,0,0]
 
@@ -29,6 +30,7 @@ chess = [[0 for i in range(size+1)] for i in range(size+1)]
 def send_msg_with_len(msg):
 	global client
 	try:
+		print(msg)
 		msg = msg.encode("utf-8")
 		client.send(("%08d"%len(msg)).encode("utf-8")) 
 		client.send(msg)  #发送数据
@@ -39,45 +41,47 @@ def handle():
 	global client,ping_time_label
 	while True:
 		try:
-			size = client.recv(8)	  #到这里程序继续向下执行
-			time.sleep(0.05)
-			data = client.recv(int(size.decode("utf-8")))
+			size = client.recv(8).decode("utf-8")	  #到这里程序继续向下执行
+			if(size):
+				time.sleep(0.05)
+				data = client.recv(int(size))
 		except:
-			data = "ERROR"
 			continue
-		if not data:
-			print("no data")
-			continue
-		
-		data = data.decode()
-		order = data.split(",")
-		print(order)
-		ping_time_label["text"] = "ping:"+str(int(time.time()*1000)-int(order[0]))
-			
-		if(order[1]=="ID_receive"):
-			ID_receive(order)
-		elif(order[1]=="color_number_receive"):
-			color_number_receive(order)
-		elif(order[1]=="get_new_list_receive"):	
-			get_new_list_receive(order)
-		elif(order[1]=="choose_aim_receive"):	
-			choose_aim_receive(order)	
-		elif(order[1]=="choose_aim_sever"):	
-			choose_aim_sever(order)	
-		elif(order[1]=="choose_aim_sucess"):	
-			choose_aim_sucess(order)	
-		elif(order[1]=="choose_aim_denied"):	
-			choose_aim_denied(order)
-		elif(order[1]=="active_which"):	
-			active_which(order)
-		elif(order[1]=="internet_paint"):	
-			internet_paint(order)
-		elif(order[1]=="receive_msg"):
-			receive_msg(order)
-		elif(order[1]=="heartbeat_check"):
-			heartbeat_check(order)
-		elif(order[1]=="internet_restart"):
-			internet_restart(order)
+
+		try:
+			data = data.decode()
+			order = data.split(",")
+			print(order)
+			ping_time_label["text"] = "ping:"+str(int(time.time()*1000)-int(order[0]))
+				
+			if(order[1]=="ID_receive"):
+				ID_receive(order)
+			elif(order[1]=="color_number_receive"):
+				color_number_receive(order)
+			elif(order[1]=="get_new_list_receive"):	
+				get_new_list_receive(order)
+			elif(order[1]=="choose_aim_receive"):	
+				choose_aim_receive(order)	
+			elif(order[1]=="choose_aim_sever"):	
+				choose_aim_sever(order)	
+			elif(order[1]=="choose_aim_sucess"):	
+				choose_aim_sucess(order)	
+			elif(order[1]=="choose_aim_denied"):
+				choose_aim_denied(order)
+			elif(order[1]=="choose_aim_error"):	
+				choose_aim_error(order)
+			elif(order[1]=="active_which"):	
+				active_which(order)
+			elif(order[1]=="internet_paint"):	
+				internet_paint(order)
+			elif(order[1]=="receive_msg"):
+				receive_msg(order)
+			elif(order[1]=="heartbeat_check"):
+				heartbeat_check(order)
+			elif(order[1]=="internet_restart"):
+				internet_restart(order)
+		except:
+			print("data ERROR")
 			
 			
 def heartbeat_check(order):
@@ -117,8 +121,7 @@ def choose_aim_receive(order):
 def choose_aim_sever(order):
 	get_new_list()
 	ans=tkinter.messagebox.askokcancel('提示', order[2]+"正在请求连接")
-	print(ans)
-	
+		
 	if(ans):
 		msg = str(int(time.time()*1000))+",choose_aim_answer,"+ID+","+order[2]+",yes"
 	else:
@@ -131,7 +134,6 @@ def choose_aim_sucess(order):
 	waiting_msgbox["text"]="正在对战"
 	comboxlist.current(comboxlist["values"].index(order[2]))  #选择第2个
 	
-	print("match success")
 	match_sucess = 1
 	waiting =0
 	
@@ -141,6 +143,10 @@ def choose_aim_denied(order):
 	waiting_msgbox["text"]="对方拒绝了你"
 	tkinter.messagebox.showinfo("提示", "对方拒绝了你")
 
+def choose_aim_error(order):
+	global waiting_msgbox
+	waiting_msgbox["text"]="请求错误"
+	tkinter.messagebox.showinfo("提示", "请求错误")
 
 def active_which(order):
 	global me_active
@@ -211,7 +217,7 @@ def paint(event):
 	else:
 		event.y = event.y//30
 	#边缘检测  
-	if((event.x > size+5) | (event.y > size+5) | (event.x < 0) | (event.y < 0)):
+	if((event.x > size) | (event.y > size) | (event.x < 1) | (event.y < 1)):
 		return
 
 	
@@ -228,11 +234,7 @@ def paint(event):
 	x2, y2 = (event.x*30 + 15), (event.y*30 + 15)
 
 	if stop == 0:
-		print(event.x)
-		print(event.y)
 		if chess[event.x][event.y] == 0: 
-			print(event.x)
-			print(event.y)
 			if(running==1):
 				if color_number == 1:
 					canvas.create_oval(last_chess[0],last_chess[1],last_chess[2],last_chess[3], fill="white",tags = "oval")
@@ -339,8 +341,11 @@ def gameover(xx, yy):
 
 def restart():
 	global canvas,size,stop,running,me_active,last_chess
-	msg = str(int(time.time()*1000))+",restart,"+ID
-	send_msg_with_len(msg)
+	try:
+		msg = str(int(time.time()*1000))+",restart,"+ID
+		send_msg_with_len(msg)
+	except:
+		print("restart ERROR")
 	canvas.delete("oval")
 	canvas.delete("xxx")
 	for i in range(size+1):
@@ -350,7 +355,7 @@ def restart():
 	running = 0
 	last_chess = [0,0,0,0,0,0]
 	change_color_number()
-	print(chess)
+
 	
 def internet_restart(order):
 	global canvas,size,stop,running,me_active,last_chess
@@ -362,17 +367,22 @@ def internet_restart(order):
 	stop = 0
 	running = 0
 	last_chess = [0,0,0,0,0,0]
-	print(chess)
+
 
 def connect_sever():
-	global ID,client,connect_label
+	global ID,client,connect_label,connected
 	connect_label["text"]="连接中"
 	try:
-		#client.connect(("gn25896538.qicp.vip",51683))
-		client.connect(("127.0.0.1",55555))
-		#client.connect(("312265bv87.picp.vip",12370))
+		if(connected==0):
+			#client.connect(("gn25896538.qicp.vip",51683))
+			client = socket.socket()
+			client.connect(("127.0.0.1",55555))
+			#client.connect(("312265bv87.picp.vip",12370))
+			connected=1
+		else:
+			print("connected ERROR")
 	except:
-		print("Connect Error")
+		print("connect Error")
 	
 	ID = connect_sever_text.get('0.0', 'end')[:-1]
 	
@@ -384,7 +394,7 @@ def connect_sever():
 	
 	msg = str(int(time.time()*1000))+",connect_sever,"+ID
 	send_msg_with_len(msg)
-	print(msg)
+
 	get_new_list()
 	
 	
@@ -399,7 +409,6 @@ def change_color_number():
 		elif(color_number==1):
 			msg = str(int(time.time()*1000))+",change_color_number,"+ID+","+"0"
 		send_msg_with_len(msg)
-		print(msg)
 	else:
 		print("CANNOT_CHANGE")
 		return
@@ -425,19 +434,17 @@ def choose_aim():
 		send_msg_with_len(msg)
 		waiting_msgbox["text"]="正在邀请..."
 
-		print(msg)
-
 def get_new_list():
 	msg = str(int(time.time()*1000))+",get_new_list,"+ID
 	send_msg_with_len(msg)
-	print(msg)
+
 
 def send_msg():
 	global msg_text
 
 	strftime = time.strftime('%H:%M:%S')
 	msg_get = send_msg_text.get('0.0', 'end')
-	print(msg_get)
+
 	msg = str(int(time.time()*1000))+",send_msg,"+ID+","+strftime+","+msg_get
 	send_msg_text.delete('0.0', 'end')
 	send_msg_with_len(msg)
@@ -448,7 +455,15 @@ def send_msg():
 	msg_text.see("end")
 
 def close_client():
-	client.close()
+	global connected,client,ID
+	if(connected==1):
+		msg = str(int(time.time()*1000))+",close_client,"+ID
+		send_msg_with_len(msg)
+		time.sleep(0.05)
+		client.close()
+		connected=0
+	else:
+		print("Nothing disconnect")
 	stop = 0
 	ID = ""
 	running = 0
@@ -490,12 +505,12 @@ if __name__ == '__main__':
 	
 	
 	
-	for num in range(1, 17):
+	for num in range(1, size+1):
 		canvas.create_line(num*30, 30, 
 							num*30, 480,
 							width=2)
 							
-	for num in range(1, 17):
+	for num in range(1, size+1):
 		canvas.create_line(30, num*30,
 							480, num*30, 
 							width=2)
@@ -507,7 +522,7 @@ if __name__ == '__main__':
 	addr_label = Label(top, text='地址:')
 	port_label = Label(top, text='端口:')
 	addr_text = Text(top,height=1, width=10)
-	addr_text.insert('0.0',"gn25896538.qicp.vip")
+	addr_text.insert('0.0',"127.0.0.1")
 	port_text = Text(top,height=1, width=10)
 	port_text.insert('0.0',"55555")
 	addr_label.place(x=500,y=0)
@@ -527,9 +542,13 @@ if __name__ == '__main__':
 	connect_sever_text.insert('0.0', "请输入昵称")
 	connect_sever_button = Button(top, text='连接服务器', command=connect_sever,bg="red",fg="white")
 	
+	close_button = Button(top, text='断开', command=close_client)
+	
+	
 	connect_sever_label.place(x=x_start,y=y_start+40)
 	connect_sever_text.place(x=x_start+50,y=y_start+40)
 	connect_sever_button.place(x=550,y=70)
+	close_button.place(x=600,y=70)
 	
 	connect_label = Label(top, text='')
 	connect_label.place(x=500,y=50)
@@ -566,8 +585,7 @@ if __name__ == '__main__':
 	send_msg_button = Button(top, text='发送', command=send_msg)
 	send_msg_button.place(x=620,y=450)
 	
-	close_button = Button(top, text='断开', command=close_client)
-	close_button.place(x=600,y=130)
+
 	
 	top.mainloop()
 

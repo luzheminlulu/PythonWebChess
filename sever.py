@@ -33,16 +33,12 @@ def handle():
 					data = s.recv(int(size))
 			except:		   
 				continue
-			
-			print(size)
-				
+
 				
 			try:
 				data = data.decode("utf-8")
 				order = data.split(",")
 				print(order)
-				
-				#print(ID)
 				
 				if(order[1]=="connect_sever"):
 					connect_sever(s,order)
@@ -62,7 +58,9 @@ def handle():
 					elif(order[1]=="heartbeat_check_ok"):
 						heartbeat_check_ok(s,order)	
 					elif(order[1]=="restart"):
-						restart(s,order)	
+						restart(s,order)
+					elif(order[1]=="close_client"):
+						close_client(s)
 				else:
 					print("ERROR ID")
 			except:		   
@@ -73,6 +71,7 @@ def handle():
 def send_msg_with_len(s,msg):
 	global socks,ID
 	try:
+		print(msg)
 		msg = msg.encode("utf-8")
 		s.send(("%08d"%len(msg)).encode("utf-8")) 
 		s.send(msg)  #发送数据
@@ -94,7 +93,7 @@ def connect_sever(s,order):
 		send_msg_with_len(s,msg)
 		return
 	ID.add(order[2])
-	heart_live[order[2]] = 3
+	heart_live[order[2]] = 2
 	sock_dict[order[2]]=s
 	id_dict[s] = order[2]
 	msg = order[0]+",ID_receive,"+order[2]
@@ -127,43 +126,57 @@ def get_new_list(s,order):
 	for i in ID:
 		msg += ","+i
 	send_msg_with_len(s,msg)
-	print(msg)
+	
 
 def choose_aim(s,order):
 	global color_number
-	color_number[order[2]] = order[4]
-	msg = order[0]+",choose_aim_receive,"+"waiting"
-	send_msg_with_len(s,msg)
-	
-	msg = order[0]+",choose_aim_sever,"+order[2]
-	send_msg_with_len(sock_dict[order[3]],msg)
+	try:
+		color_number[order[2]] = order[4]
+		msg = order[0]+",choose_aim_receive,"+"waiting"
+		send_msg_with_len(s,msg)
+		
+		msg = order[0]+",choose_aim_sever,"+order[2]
+		send_msg_with_len(sock_dict[order[3]],msg)
+	except:
+		print("choose_aim ERROR")
 
-
-	print("choose_aim_receive")
 	
 def choose_aim_answer(s,order):
 	global match_list,sock_dict,color_number,active_which
+	try:
+		del match_list[match_list[id_dict[s]]]
+	except:
+		print("del choose_aim_answer match_list match_list ERROR")
+	try:
+		del match_list[id_dict[s]]
+	except:
+		print("del choose_aim_answer match_list ERROR")
+		
 	if(order[4]=="yes"):
-		match_list[order[2]]=order[3]
-		match_list[order[3]]=order[2]
-		msg = order[0]+",choose_aim_sucess,"+order[3]
-		send_msg_with_len(s,msg)
-		msg = order[0]+",choose_aim_sucess,"+order[2]
-		send_msg_with_len(sock_dict[order[3]],msg)
-		
-		color_number[order[2]]=str(1-int(color_number[match_list[order[2]]]))
-		print (color_number[order[2]])
-		msg = order[0]+",color_number_receive,"+color_number[order[2]]
-		send_msg_with_len(s,msg)
+		try:
+			match_list[order[2]]=order[3]
+			match_list[order[3]]=order[2]
+			msg = order[0]+",choose_aim_sucess,"+order[3]
+			send_msg_with_len(s,msg)
+			msg = order[0]+",choose_aim_sucess,"+order[2]
+			send_msg_with_len(sock_dict[order[3]],msg)
 			
-		active_which[order[2]] = int(color_number[order[2]])
-		active_which[match_list[order[2]]] = int(color_number[match_list[order[2]]])
-		
-		msg = order[0]+",active_which,"+str(active_which[match_list[order[2]]])
-		send_msg_with_len(sock_dict[order[3]],msg)
-		
-		msg = order[0]+",active_which,"+str(active_which[order[2]])
-		send_msg_with_len(s,msg)
+			color_number[order[2]]=str(1-int(color_number[match_list[order[2]]]))
+			
+			msg = order[0]+",color_number_receive,"+color_number[order[2]]
+			send_msg_with_len(s,msg)
+				
+			active_which[order[2]] = int(color_number[order[2]])
+			active_which[match_list[order[2]]] = int(color_number[match_list[order[2]]])
+			
+			msg = order[0]+",active_which,"+str(active_which[match_list[order[2]]])
+			send_msg_with_len(sock_dict[order[3]],msg)
+			
+			msg = order[0]+",active_which,"+str(active_which[order[2]])
+			send_msg_with_len(s,msg)
+		except:
+			msg = order[0]+",choose_aim_error"
+			send_msg_with_len(s,msg)
 
 	elif(order[4]=="no"):
 		msg = order[0]+",choose_aim_denied"
@@ -184,12 +197,18 @@ def local_paint(s,order):
 	send_msg_with_len(sock_dict[match_list[order[2]]],msg)
 	
 def send_msg(s,order):
-	msg = order[0]+",receive_msg,"+order[2]+","+order[3]+","+order[4]
-	send_msg_with_len(sock_dict[match_list[order[2]]],msg)
+	try:
+		msg = order[0]+",receive_msg,"+order[2]+","+order[3]+","+order[4]
+		send_msg_with_len(sock_dict[match_list[order[2]]],msg)
+	except:
+		print("send_msg ERROR")
 
 def restart(s,order):
-	msg = order[0]+",internet_restart"
-	send_msg_with_len(sock_dict[match_list[order[2]]],msg)
+	try:
+		msg = order[0]+",internet_restart"
+		send_msg_with_len(sock_dict[match_list[order[2]]],msg)
+	except:
+		print("restart ERROR")
 
 def heartbeat():
 	global heart_live,socks,id_dict
@@ -198,9 +217,8 @@ def heartbeat():
 			try:
 				print("%s heartbeat"%id_dict[s])
 				if(heart_live[id_dict[s]]==0):
-					print("%s disconnected"%id_dict[s])
-					socks.remove(s)
-					ID.remove(id_dict[s])
+					close_client(s)
+					
 				else:
 					msg = str(int(time.time()*1000))+",heartbeat_check"
 					send_msg_with_len(s,msg)
@@ -212,9 +230,52 @@ def heartbeat():
 def heartbeat_check_ok(s,order):
 	global heart_live
 	print("%s heartbeat_check_ok"%id_dict[s])
-	heart_live[order[2]]=3
+	heart_live[order[2]]=2
 
-	
+def close_client(s):
+	try:
+		print("%s disconnected"%id_dict[s])
+	except:
+		print("print ERROR")
+	try:
+		socks.remove(s)
+	except:
+		print("del socks ERROR")
+	try:
+		del color_number[id_dict[s]]
+	except:
+		print("del color_number ERROR")
+	try:
+		del sock_dict[id_dict[s]]
+	except:
+		print("del sock_dict ERROR")
+	try:
+		del active_which[id_dict[s]]
+	except:
+		print("del active_which ERROR")
+	try:
+		del heart_live[id_dict[s]]
+	except:
+		print("del heart_live ERROR")
+	try:
+		del match_list[match_list[id_dict[s]]]
+	except:
+		print("del match_list match_list ERROR")
+	try:
+		del match_list[id_dict[s]]
+	except:
+		print("del match_list ERROR")
+	try:
+		ID.remove(id_dict[s])
+	except:
+		print("del ID ERROR")
+	try:
+		del id_dict[s]
+	except:
+		print("del id_dict ERROR")
+
+
+
 t1 = threading.Thread(target=handle)	#子线程
 t2 = threading.Thread(target=heartbeat)	#子线程
 
